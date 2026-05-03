@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phonics PH & WH Game</title>
+
+<style>
+body {
+  font-family: "Comic Sans MS", sans-serif;
+  text-align: center;
+  background: linear-gradient(to bottom, #cceeff, #ffffff);
+}
+
+#gameBox {
+  max-width: 500px;
+  margin: auto;
+  padding: 20px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+img { width: 200px; }
+
+button {
+  padding: 10px 20px;
+  margin: 5px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  background-color: #66ccff;
+}
+
+button:hover { background-color: #33bbff; }
+
+#hearts { font-size: 24px; }
+
+.letterBtn {
+  padding: 10px;
+  margin: 3px;
+  font-size: 18px;
+  border-radius: 8px;
+}
+
+.used { background-color: #ccc; }
+
+#soundwave {
+  display: none;
+  font-size: 24px;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {opacity: 0.3;}
+  50% {opacity: 1;}
+  100% {opacity: 0.3;}
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎯 PH & WH Game</h1>
+
+<div id="gameBox">
+  <h2 id="score">Score: 0 / 12</h2>
+
+  <img id="image" src="">
+
+  <h3>Look, Say, and Spell</h3>
+
+  <!-- 🔊 LISTEN BUTTON -->
+  <button onclick="playModel()">🔊 Listen</button>
+
+  <div id="soundwave">🎤 Listening...</div>
+
+  <button onclick="startListening()">🎤 Speak</button>
+
+  <p id="feedback"></p>
+
+  <div id="spellingSection" style="display:none;">
+    <p id="wordDisplay"></p>
+    <div id="hearts">❤️❤️❤️❤️❤️</div>
+    <div id="keyboard"></div>
+  </div>
+
+  <button id="nextBtn" onclick="nextWord()" style="display:none;">Next</button>
+  <button id="restartBtn" onclick="restartGame()" style="display:none;">Play Again</button>
+</div>
+
+<!-- 🔊 SOUND EFFECTS -->
+<audio id="correctSpeak" src="https://cdn.pixabay.com/audio/2022/03/15/audio_3f6b1dfb1f.mp3"></audio>
+<audio id="wrongSpeak" src="https://cdn.pixabay.com/audio/2022/03/15/audio_c9c8b1e2c5.mp3"></audio>
+<audio id="correctLetter" src="https://cdn.pixabay.com/audio/2022/10/16/audio_12b35f6b6b.mp3"></audio>
+<audio id="wrongLetter" src="https://cdn.pixabay.com/audio/2022/03/10/audio_8c6719b72c.mp3"></audio>
+<audio id="winSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_6c0a6f4c2c.mp3"></audio>
+
+<script>
+const words = [
+  {word:"photo", img:"https://i.postimg.cc/631KgZrY/photo.png"},
+  {word:"phone", img:"https://i.postimg.cc/nL2pKgCm/phone.png"},
+  {word:"dolphin", img:"https://i.postimg.cc/QtnDw7gd/dolphin.png"},
+  {word:"white", img:"https://i.postimg.cc/265m0GZ2/white.png"},
+  {word:"whale", img:"https://i.postimg.cc/25GrdMVh/whale.png"},
+  {word:"wheel", img:"https://i.postimg.cc/vBmM0hVc/wheel.png"}
+];
+
+let index = 0;
+let score = 0;
+let lives = 5;
+let currentWord = "";
+let displayWord = [];
+let speakingDone = false;
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
+recognition.lang = "en-US";
+
+function playSound(id){
+  const sound = document.getElementById(id);
+  sound.currentTime = 0;
+  sound.play();
+}
+
+// 🔊 MODEL PRONUNCIATION
+function playModel(){
+  const utter = new SpeechSynthesisUtterance(currentWord);
+  utter.lang = "en-US";
+  utter.rate = 0.9;
+  speechSynthesis.speak(utter);
+}
+
+function loadWord() {
+  const item = words[index];
+  currentWord = item.word;
+  speakingDone = false;
+
+  document.getElementById("image").src = item.img;
+  document.getElementById("feedback").innerText = "";
+  document.getElementById("spellingSection").style.display = "none";
+  document.getElementById("nextBtn").style.display = "none";
+}
+
+function startListening() {
+  document.getElementById("soundwave").style.display = "block";
+  recognition.start();
+}
+
+recognition.onresult = function(event) {
+  let spoken = event.results[0][0].transcript.toLowerCase().trim();
+  document.getElementById("soundwave").style.display = "none";
+
+  if (spoken.includes(currentWord.slice(0,3))) {
+    playSound("correctSpeak");
+
+    if (!speakingDone){
+      score++; // ✅ ONLY speaking point
+      speakingDone = true;
+    }
+
+    updateScore();
+    startSpelling();
+
+  } else {
+    playSound("wrongSpeak");
+    document.getElementById("feedback").innerText = "Try again!";
+  }
+};
+
+function startSpelling() {
+  document.getElementById("spellingSection").style.display = "block";
+  displayWord = Array(currentWord.length).fill("_");
+  lives = 5;
+  updateHearts();
+  updateWord();
+  createKeyboard();
+}
+
+function createKeyboard() {
+  const keyboard = document.getElementById("keyboard");
+  keyboard.innerHTML = "";
+
+  "abcdefghijklmnopqrstuvwxyz".split("").forEach(letter => {
+    let btn = document.createElement("button");
+    btn.innerText = letter;
+    btn.className = "letterBtn";
+
+    btn.onclick = function() {
+      btn.classList.add("used");
+      btn.disabled = true;
+
+      if (currentWord.includes(letter)) {
+        playSound("correctLetter");
+
+        for (let i=0;i<currentWord.length;i++){
+          if(currentWord[i] === letter){
+            displayWord[i] = letter;
+          }
+        }
+        updateWord();
+
+        if (!displayWord.includes("_")) {
+          score++; // ✅ ONLY spelling point
+          updateScore();
+          document.getElementById("nextBtn").style.display = "inline";
+        }
+
+      } else {
+        playSound("wrongLetter");
+        lives--;
+        updateHearts();
+
+        if (lives === 0) {
+          document.getElementById("feedback").innerText = "Try again!";
+          document.getElementById("nextBtn").style.display = "inline";
+        }
+      }
+    };
+
+    keyboard.appendChild(btn);
+  });
+}
+
+function updateWord(){
+  document.getElementById("wordDisplay").innerText = displayWord.join(" ");
+}
+
+function updateHearts(){
+  document.getElementById("hearts").innerText = "❤️".repeat(lives);
+}
+
+function updateScore(){
+  document.getElementById("score").innerText = "Score: " + score + " / 12";
+
+  if (score === 12) {
+    playSound("winSound");
+    document.getElementById("feedback").innerText = "🎉 AMAZING JOB!";
+    document.getElementById("restartBtn").style.display = "inline";
+  }
+}
+
+function nextWord(){
+  index++;
+  if (index < words.length){
+    loadWord();
+  }
+}
+
+function restartGame(){
+  index = 0;
+  score = 0;
+  updateScore();
+  document.getElementById("restartBtn").style.display = "none";
+  loadWord();
+}
+
+loadWord();
+</script>
+
+</body>
+</html>
